@@ -68,6 +68,14 @@
             <artifactId>druid-spring-boot-starter</artifactId>
             <version>1.1.23</version>
         </dependency>
+
+        <dependency>
+            <groupId>com.mathworks</groupId>
+            <artifactId>matlabengine</artifactId>
+            <version>R2022a</version>
+            <scope>system</scope>
+            <systemPath>${basedir}/lib/engine.jar</systemPath>
+        </dependency>
 <!--        <dependency>-->
 <!--            <groupId>com.aliyun</groupId>-->
 <!--            <artifactId>aliyun-java-sdk-core</artifactId>-->
@@ -88,6 +96,25 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <version>2.4.5</version>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-dependencies</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>copy-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <includeGroupIds>com.mathworks</includeGroupIds>
+                            <includeArtifactIds>matlabengine</includeArtifactIds>
+                            <outputDirectory>${project.build.directory}/lib</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
+
 </project>
