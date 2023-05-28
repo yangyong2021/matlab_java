@@ -12,7 +12,6 @@
     <style>
         #member-app .notAdmin::after {
             border: 0 !important;
-
         }
     </style>
 </head>
@@ -34,13 +33,7 @@
                         @click="handleQuery"
                 ></i>
             </el-input>
-            <el-button
-                    type="primary"
-                    class="continue"
-                    @click="addMemberHandle('test')"
-            >
-                + 测试
-            </el-button>
+
             <el-button
                     type="primary"
                     @click="addMemberHandle('add')"
@@ -68,21 +61,39 @@
             <el-table-column label="寻优状态">
                 <template slot-scope="scope">
                     <template v-if="String(scope.row.status) === '0'">
-                        <el-button type="danger" round style="height: 25px;padding: 0px 10px">未寻优</el-button>
+                        <el-button type="danger" round style="height: 25px;padding: 0px 10px">
+                            <i class="el-icon-aim"></i>
+                            <span style="vertical-align: middle;margin-left: 0px">未寻优</span>
+                        </el-button>
                     </template>
                     <template v-else-if="String(scope.row.status) === '1'">
-                        <el-button type="success" round style="height: 25px;padding: 0px 10px">已寻优</el-button>
+                        <el-button type="success" round style="height: 25px;padding: 0px 10px">
+                            <i class="el-icon-circle-check"></i>
+                            <span style="vertical-align: middle;margin-left: 0px">已寻优</span>
+                        </el-button>
                     </template>
                     <template v-else>
-                        <el-button type="warning" round style="height: 25px;padding: 0px 10px">
-                            <el-icon class="is-loading" style="vertical-align: middle">
-                                <Loading/>
-                            </el-icon>
-                            <span style="vertical-align: middle">寻优中</span>
+                        <el-button type="primary" round
+                                   style="height: 25px;padding: 0px 10px;background: #409eff;border-color: #409eff;color: #FFFFFF">
+                            <i class="el-icon-loading"></i>
+                            <span style="vertical-align: middle;margin-left: 0px">寻优中</span>
                         </el-button>
                     </template>
                 </template>
             </el-table-column>
+            <!--收敛曲线-->
+            <el-table-column prop="image" label="图片" align="center">
+                <template slot-scope="{ row }">
+                    <el-image style="width: auto; height: 40px; border:none;cursor: pointer;"
+                              :src="getImage(row)"
+                              :preview-src-list="[ `/common/download?name=${row.name}-${row.dataname}` ]">
+                        <div slot="error" class="image-slot">
+                            <img src="./../../images/noImg.png" style="width: auto; height: 40px; border:none;">
+                        </div>
+                    </el-image>
+                </template>
+            </el-table-column>
+
             <el-table-column
                     label="操作"
                     width="160"
@@ -93,10 +104,9 @@
                             type="text"
                             size="small"
                             class="blueBug"
-                            @click="addMemberHandle(scope.row.id)"
-                            :class="{notAdmin:user !== 'admin'}"
+                            @click="addMemberHandle(scope.row)"
                     >
-                        编辑
+                        查看
                     </el-button>
                     <el-button
                             type="text"
@@ -124,46 +134,58 @@
     <el-dialog
             :title="classData.title"
             :visible.sync="classData.dialogVisible"
-            width="30%"
+            width="40%"
             :before-close="handleClose"
     >
-        <el-table
-                class="demo-form-inline"
-                label-width="100px"
-        >
-            <el-table-column prop="image" label="图片" align="center">
-                <template slot-scope="{ row }">
-                    <el-image style="width: auto; height: 40px; border:none;cursor: pointer;"
-                              :src="getImage(row.image)"
-                              :preview-src-list="[ `/common/download?name=${row.image}` ]" >
-                        <div slot="error" class="image-slot">
-                            <img src="./../../images/noImg.png"  style="width: auto; height: 40px; border:none;" >
-                        </div>
-                    </el-image>
-                </template>
-            </el-table-column>
-        </el-table>
-        <span
-                slot="footer"
-                class="dialog-footer"
-        >
-        <el-button
-                size="medium"
-                @click="classData.dialogVisible = false"
-        >取 消</el-button>
-        <el-button
-                type="primary"
-                size="medium"
-                @click="submitForm()"
-        >确 定</el-button>
-        <el-button
-                v-if="action != 'edit'"
-                type="primary"
-                size="medium"
-                class="continue"
-                @click="submitForm('go')"
-        > 保存并继续添加 </el-button>
-      </span>
+        <template v-if="classData.title === '添加方法'">
+            <el-form ref="formData" :model="formData" :rules="rules" label-width="90px">
+                <el-row>
+                    <el-col :span="14">
+                        <el-form-item label="算法名称" prop="methodName">
+                            <el-input v-model="formData.methodName" placeholder="请输入方法名"></el-input>
+                        </el-form-item>
+                    </el-col>
+                    <el-col :span="10">
+                        <el-form-item label="选择数据" prop="dataset">
+                            <el-select v-model="formData.dataset">
+                                <el-option label="Flags" value="flags"></el-option>
+                                <el-option label="Emotions" value="emotions"></el-option>
+                                <el-option label="Birds" value="birds"></el-option>
+                            </el-select>
+                        </el-form-item>
+                    </el-col>
+                </el-row>
+                <el-row>
+                    <el-col :span="24">
+                        <el-form-item label="数据处理">
+                            <el-radio-group v-model="formData.dataProcessing">
+                                <el-radio label="mapminmax">Map Min Max</el-radio>
+                                <el-radio label="z-score">Z-Score</el-radio>
+                                <el-radio label="l-21-norm">L-21 Norm</el-radio>
+                            </el-radio-group>
+                        </el-form-item>
+                    </el-col>
+                </el-row>
+            </el-form>
+            <div slot="footer">
+                <el-button @click="handleClose">取消</el-button>
+                <el-button type="primary" @click="submitForm()">确定</el-button>
+            </div>
+        </template>
+
+        <template v-else>
+            <img :src="getImage(classData)" alt="图片" class="modal-image" width="100%"/>
+
+            <span
+                    slot="footer"
+                    class="dialog-footer"
+            >
+            <el-button
+                    size="medium"
+                    @click="classData.dialogVisible = false">取 消</el-button>
+            </span>
+        </template>
+
     </el-dialog>
 </div>
 <!-- 开发环境版本，包含了有帮助的命令行警告 -->
@@ -174,6 +196,7 @@
 <script src="../../plugins/axios/axios.min.js"></script>
 <script src="../../js/request.js"></script>
 <script src="../../api/member.js"></script>
+<script src="../../js/validate.js"></script>
 <script>
     new Vue({
         el: '#member-app',
@@ -183,22 +206,36 @@
                 counts: 0,
                 page: 1,
                 pageSize: 10,
-                tableData: [{'name': 'LRDSMG', 'dataname': 'flags', 'predata': 'l21-norm', 'status': 2}],
+                tableData: [{'name': 'LRDSMG', 'dataname': 'flags', 'predata': 'l21-norm', 'status': 0},
+                    {'name': 'LRDSMG', 'dataname': 'genbase', 'predata': 'l21-norm', 'status': 1},
+                    {'name': 'LRDSMG', 'dataname': 'flags', 'predata': 'l21-norm', 'status': 2}],
                 id: '',
                 status: '',
                 classData: {
-                    'title': '添加菜品分类',
                     'dialogVisible': false,
                     'categoryId': '',
                     'name': '',
+                    'dataname': '',
                     sort: ''
+                },
+                formData: {
+                    methodName: '',
+                    dataset: '',
+                    dataProcessing: ''
+                },
+                rules: {
+                    methodName: [
+                        { required: true, message: '算法名称不能为空', trigger: 'blur' }
+                    ],
+                    dataset: [
+                        { required: true, message: '请选择数据', trigger: 'change' }
+                    ]
                 }
             }
         },
         computed: {},
         created() {
             this.init()
-            this.user = JSON.parse(localStorage.getItem('userInfo')).dataname
         },
         mounted() {
         },
@@ -218,7 +255,8 @@
                     this.$message.error('请求出错了：' + err)
                 })
             },
-            getImage (image) {
+            getImage(classData) {
+                image = classData.name + '-' + classData.dataname
                 return `/common/download?name=${image}`
             },
             handleQuery() {
@@ -228,21 +266,15 @@
             // 添加
             addMemberHandle(st) {
                 if (st === 'add') {
-                    window.parent.menuHandle({
-                        id: '2',
-                        url: '/backend/page/member/add.html',
-                        name: '添加员工'
-                    }, true)
-                } else if (st === 'test') {
-                    this.classData.title = "收敛性曲线"
-                    this.classData.dialogVisible = true;
-                    url: '/backend/page/member/add.html?id=' + st
+                    this.classData.title = "添加方法"
+                    this.classData.dataname = st
+                    this.classData.dialogVisible = true
                 } else {
-                    window.parent.menuHandle({
-                        id: '2',
-                        url: '/backend/page/member/add.html?id=' + st,
-                        name: '修改员工'
-                    }, true)
+                    this.classData.title = "收敛性曲线"
+                    this.classData.dataname = st.dataname
+                    this.classData.name = st.name
+                    this.classData.dialogVisible = true
+                    // this.imageUrl = `/common/download?name=test.png`
                 }
             },
             //状态修改
@@ -272,6 +304,37 @@
             handleCurrentChange(val) {
                 this.page = val
                 this.init()
+            },
+            // 关闭弹窗
+            handleClose(st) {
+                this.classData.dialogVisible = false
+                // 重置表单数据
+                this.formData.methodName = '';
+                this.formData.dataset = '';
+                this.formData.dataProcessing = '';
+                // 重置表单验证状态
+                this.$refs.formData.resetFields();
+            },
+            submitForm() {
+                // 表单验证
+                this.$refs.formData.validate(valid => {
+                    if (valid) {
+                        // 执行表单提交操作
+                        this.executeFormSubmit();
+                    } else {
+                        console.log('表单校验失败');
+                    }
+                });
+            },
+            executeFormSubmit() {
+                // 表单提交操作
+                console.log('方法名:', this.formData.methodName);
+                console.log('数据集选择:', this.formData.dataset);
+                console.log('数据处理方式:', this.formData.dataProcessing);
+                // 这里可以进行相应的处理逻辑，如发送请求或执行其他操作
+                // ...
+                // 关闭弹窗
+                this.handleClose();
             }
         }
     })
