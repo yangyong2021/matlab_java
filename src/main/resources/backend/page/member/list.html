@@ -51,12 +51,16 @@
                              label="方法名称"
             ></el-table-column>
             <el-table-column style="font-family: 'Times New Roman'"
-                             prop="dataname"
+                             prop="mainName"
+                             label="主函数名"
+            ></el-table-column>
+            <el-table-column style="font-family: 'Times New Roman'"
+                             prop="dataName"
                              label="数据集名称"
             ></el-table-column>
             <el-table-column
-                    prop="predata"
-                    label="数据预处理方式"
+                    prop="methods"
+                    label="其他.m文件"
             ></el-table-column>
             <el-table-column label="寻优状态">
                 <template slot-scope="scope">
@@ -86,7 +90,7 @@
                 <template slot-scope="{ row }">
                     <el-image style="width: auto; height: 40px; border:none;cursor: pointer;"
                               :src="getImage(row)"
-                              :preview-src-list="[ `/common/download?name=${row.name}-${row.dataname}` ]">
+                              :preview-src-list="[ `/common/download?name=${row.image}` ]">
                         <div slot="error" class="image-slot">
                             <img src="./../../images/noImg.png" style="width: auto; height: 40px; border:none;">
                         </div>
@@ -100,14 +104,37 @@
                     align="center"
             >
                 <template slot-scope="scope">
+                    <template v-if="String(scope.row.status) === '0'">
                     <el-button
                             type="text"
                             size="small"
                             class="blueBug"
                             @click="addMemberHandle(scope.row)"
                     >
-                        查看
+                        执行寻优
                     </el-button>
+                    </template>
+                    <template v-else-if="String(scope.row.status) === '1'">
+                        <el-button
+                                type="text"
+                                size="small"
+                                class="blueBug"
+                                @click="addMemberHandle(scope.row)"
+
+                        >
+                            查看图片
+                        </el-button>
+                    </template>
+                    <template v-else>
+                        <el-button
+                                type="text"
+                                size="small"
+                                class="blueBug"
+                                disabled
+                        >
+                            禁止点击
+                        </el-button>
+                    </template>
                     <el-button
                             type="text"
                             size="small"
@@ -135,7 +162,6 @@
             :title="classData.title"
             :visible.sync="classData.dialogVisible"
             width="50%"
-            :before-close="handleClose"
     >
         <template v-if="classData.title === '添加方法'">
             <el-upload
@@ -173,13 +199,13 @@
             </el-radio-group>
             <div slot="footer">
                 <el-button style="margin-left: 10px;" type="success" @click="submitUpload('method')">上传.m文件</el-button>
-                <el-button @click="handleClose('method')">取消</el-button>
+                <el-button type="warning" @click="commitMethod">马上执行寻优</el-button>
+                <el-button @click="handleClose('method')">暂时不寻优</el-button>
             </div>
         </template>
 
         <template v-else>
             <img :src="getImage(classData)" alt="图片" class="modal-image" width="100%"/>
-
             <span
                     slot="footer"
                     class="dialog-footer"
@@ -209,7 +235,7 @@
                 <el-button slot="trigger" type="primary"
                            style="background: #409eff;border-color: #409eff;color: #FFFFFF">选取文件
                 </el-button>
-                <div slot="tip" class="el-upload__tip">只能上传.mat文件，支持多个上传</div>
+                <div slot="tip" class="el-upload__tip">只能上传.mat文件，文件数量不多于10个</div>
             </el-upload>
             <div slot="footer">
                 <el-button style="margin-left: 10px;" type="success" @click="submitUpload('data')">上传.mat文件</el-button>
@@ -237,16 +263,15 @@
                 counts: 0,
                 page: 1,
                 pageSize: 10,
-                tableData: [{'name': 'LRDSMG', 'dataname': 'flags', 'predata': 'l21-norm', 'status': 0},
-                    {'name': 'LRDSMG', 'dataname': 'genbase', 'predata': 'l21-norm', 'status': 1},
-                    {'name': 'LRDSMG', 'dataname': 'flags', 'predata': 'l21-norm', 'status': 2}],
+                tableData: [],
                 id: '',
-                status: '',
+                status: 0,
                 classData: {
                     'dialogVisible': false,
                     'categoryId': '',
                     'name': '',
-                    'dataname': '',
+                    'dataName': '',
+                    'image': '',
                     sort: ''
                 },
                 fileList: [],
@@ -255,10 +280,12 @@
                 value: '',
                 innerVisible: false,
                 matList: [],
-                limit: 2,
+                limit: 10,
+                responseStr: '', //记录返回后的值
             }
         },
-        computed: {},
+        computed: {
+        },
         created() {
             this.init()
         },
@@ -272,16 +299,14 @@
                     name: this.input ? this.input : undefined
                 }
                 await getMemberList(params).then(res => {
-                    if (String(res.code) === '1') {
-                        this.tableData = res.data.records || []
-                        this.counts = res.data.total
-                    }
+                    this.tableData = res.data.records || []
+                    this.counts = res.data.total
                 }).catch(err => {
                     this.$message.error('请求出错了：' + err)
                 })
             },
             getImage(classData) {
-                image = classData.name + '-' + classData.dataname
+                image = classData.image
                 return `/common/download?name=${image}`
             },
             handleQuery() {
@@ -292,13 +317,14 @@
             addMemberHandle(st) {
                 if (st === 'add') {
                     this.classData.title = "添加方法"
-                    this.classData.dataname = st
+                    this.classData.dataName = st
                     this.classData.dialogVisible = true
                     this.loadOptionData();
                 } else {
                     this.classData.title = "收敛性曲线"
-                    this.classData.dataname = st.dataname
+                    this.classData.dataName = st.dataName
                     this.classData.name = st.name
+                    this.classData.image = st.image
                     this.classData.dialogVisible = true
                     // this.imageUrl = `/common/download?name=test.png`
                 }
@@ -360,16 +386,35 @@
                         .post('/common/upload', formData)
                         .then((response) => {
                             console.log('Upload response:', response.data);
+                            window.localStorage.setItem("status",1)
+                            window.localStorage.setItem("responseStr", response.data.data)
                             // 处理上传成功后的逻辑
-                            this.$refs.upload.submit();
-                            this.classData.dialogVisible = false;
+                            this.$refs.upload.delete
+                            this.$message.success("文件上传成功！！！")
                         })
                         .catch((error) => {
                             console.error('Upload error:', error);
                             // 处理上传失败后的逻辑
                         });
                 } else {
-                    window.alert("123")
+                    const formDataMat = new FormData();
+                    // 添加文件
+                    this.matList.forEach(file => {
+                        formDataMat.append('files[]', file.raw);
+                    });
+                    // 发送请求到后端，传递formData
+                    axios
+                        .post('/common/uploadMat', formDataMat)
+                        .then((response) => {
+                            console.log('Upload response:', response.data);
+                            // 处理上传成功后的逻辑
+                            this.$refs.upload.submit();
+                            this.innerVisible = false;
+                        })
+                        .catch((error) => {
+                            console.error('Upload error:', error);
+                            // 处理上传失败后的逻辑
+                        });
                 }
 
             },
@@ -380,7 +425,6 @@
                 console.log(file);
             },
             handleChange(file, fileList) {
-
                 this.fileList = fileList;
             },
             handleRemoveMat(file, fileList) {
@@ -390,7 +434,7 @@
                 console.log(file);
             },
             handleExceedMat(files, fileList) {
-                this.$message.error('最多只能上传2个.mat文件');
+                this.$message.error('最多只能上传10个.mat文件');
             },
             handleChangeMat(file, fileList) {
                 this.matList = fileList;
@@ -404,6 +448,16 @@
                 .catch(error =>{
                     console.error('Error: 加载数据集失败',error);
                 });
+            },
+            // 立即寻优
+            commitMethod(){
+                const responseStr = window.localStorage.getItem("responseStr")
+                if (window.localStorage.getItem("status")){
+                    console.log(responseStr)
+                }else {
+                    this.$message.error('请先上传后在执行寻优')
+                }
+
             }
         }
     })

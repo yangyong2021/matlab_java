@@ -28,7 +28,7 @@ public class commonController {
 
         log.info("图片名称：{}",name);
         try{
-            FileInputStream fileInputStream = new FileInputStream(new File((basePath + name+".png")));
+            FileInputStream fileInputStream = new FileInputStream(new File((basePath + name)));
 
             ServletOutputStream outputStream = response.getOutputStream();
             response.setContentType("image/png");
@@ -49,6 +49,34 @@ public class commonController {
                             @RequestParam("optionValue") String optionValue,
                             @RequestParam("files[]") MultipartFile []files) {
         log.info("文件上传={},{},{}",markedFile,optionValue,files);
+        String subStr = null;
+        for (MultipartFile file : files) {
+            // 对每个文件执行操作，如保存到磁盘、处理数据等
+            //原始文件名
+            String originalFilename = file.getOriginalFilename();
+            //原始文件名
+            int dotIndex = markedFile.indexOf('.');
+            subStr = markedFile.substring(0, dotIndex);
+//            String suffix = originalFilename.substring(originalFilename.lastIndexOf("."));
+            // 使用UUID生成文件名，防止文件名相同覆盖
+//            String fileName = UUID.randomUUID().toString() + suffix;
+            File dir = new File(basePath);
+            if (!dir.exists()){
+                dir.mkdir();
+            }
+            try {
+                file.transferTo(new File(basePath + originalFilename));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            // file.getInputStream() 可以用于读取文件内容
+            // markedFile 是单选框选中的值
+        }
+        return R.success(subStr);
+    }
+    @PostMapping("/uploadMat")
+    public R<String> uploadMat(@RequestParam("files[]") MultipartFile []files) {
+        log.info("文件上传={}",files);
         for (MultipartFile file : files) {
             // 对每个文件执行操作，如保存到磁盘、处理数据等
             //原始文件名
