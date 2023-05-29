@@ -362,6 +362,7 @@
                 if (type === 'method') {
                     this.classData.dialogVisible = false
                 } else {
+
                     this.innerVisible = false
                 }
             },
@@ -408,7 +409,7 @@
                         .then((response) => {
                             console.log('Upload response:', response.data);
                             // 处理上传成功后的逻辑
-                            this.$refs.upload.submit();
+                            this.loadOptionData()
                             this.innerVisible = false;
                         })
                         .catch((error) => {
