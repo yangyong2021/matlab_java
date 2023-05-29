@@ -134,42 +134,46 @@
     <el-dialog
             :title="classData.title"
             :visible.sync="classData.dialogVisible"
-            width="40%"
+            width="50%"
             :before-close="handleClose"
     >
         <template v-if="classData.title === '添加方法'">
-            <el-form ref="formData" :model="formData" :rules="rules" label-width="90px">
-                <el-row>
-                    <el-col :span="14">
-                        <el-form-item label="算法名称" prop="methodName">
-                            <el-input v-model="formData.methodName" placeholder="请输入方法名"></el-input>
-                        </el-form-item>
-                    </el-col>
-                    <el-col :span="10">
-                        <el-form-item label="选择数据" prop="dataset">
-                            <el-select v-model="formData.dataset">
-                                <el-option label="Flags" value="flags"></el-option>
-                                <el-option label="Emotions" value="emotions"></el-option>
-                                <el-option label="Birds" value="birds"></el-option>
-                            </el-select>
-                        </el-form-item>
-                    </el-col>
-                </el-row>
-                <el-row>
-                    <el-col :span="24">
-                        <el-form-item label="数据处理">
-                            <el-radio-group v-model="formData.dataProcessing">
-                                <el-radio label="mapminmax">Map Min Max</el-radio>
-                                <el-radio label="z-score">Z-Score</el-radio>
-                                <el-radio label="l-21-norm">L-21 Norm</el-radio>
-                            </el-radio-group>
-                        </el-form-item>
-                    </el-col>
-                </el-row>
-            </el-form>
+            <el-upload
+                    style="width: 100%"
+                    class="upload-demo"
+                    ref="upload"
+                    accept=".m"
+                    action="/common/upload"
+                    :on-preview="handlePreview"
+                    :on-remove="handleRemove"
+                    :on-change="handleChange"
+                    v-model:file-list="fileList"
+                    :auto-upload="false">
+                <el-button slot="trigger" type="primary"
+                           style=" background: #409eff;border-color: #409eff;color: #FFFFFF">选取文件
+                </el-button>
+                <el-select v-model="value" placeholder="请选择数据集n*d*c" style="width: 36%">
+                    <el-option
+                            v-for="item in options"
+                            :key="item.id"
+                            :label="item.label"
+                            :value="item.value">
+                    </el-option>
+                </el-select>
+                <el-button
+                        type="primary"
+                        @click="innerVisible = true"
+                        style="background: #409eff;border-color: #409eff;color: #FFFFFF">
+                    没有数据集？？？重新上传
+                </el-button>
+                <div slot="tip" class="el-upload__tip">只能上传.m文件，支持多个上传</div>
+            </el-upload>
+            <el-radio-group v-model="markedFile">
+                <el-radio :label="file.name" v-for="file in fileList" :key="file.uid">{{ file.name }}</el-radio>
+            </el-radio-group>
             <div slot="footer">
-                <el-button @click="handleClose">取消</el-button>
-                <el-button type="primary" @click="submitForm()">确定</el-button>
+                <el-button style="margin-left: 10px;" type="success" @click="submitUpload('method')">上传.m文件</el-button>
+                <el-button @click="handleClose('method')">取消</el-button>
             </div>
         </template>
 
@@ -185,8 +189,35 @@
                     @click="classData.dialogVisible = false">取 消</el-button>
             </span>
         </template>
-
+        <el-dialog
+                width="30%"
+                title="上传数据集"
+                :visible.sync="innerVisible"
+                append-to-body>
+            <el-upload
+                    class="upload-demo"
+                    ref="uploadMat"
+                    action="/common/uploadMat"
+                    accept=".mat"
+                    :limit="limit"
+                    :on-preview="handlePreviewMat"
+                    :on-remove="handleRemoveMat"
+                    :on-change="handleChangeMat"
+                    :on-exceed="handleExceedMat"
+                    v-model:file-list="matList"
+                    :auto-upload="false">
+                <el-button slot="trigger" type="primary"
+                           style="background: #409eff;border-color: #409eff;color: #FFFFFF">选取文件
+                </el-button>
+                <div slot="tip" class="el-upload__tip">只能上传.mat文件，支持多个上传</div>
+            </el-upload>
+            <div slot="footer">
+                <el-button style="margin-left: 10px;" type="success" @click="submitUpload('data')">上传.mat文件</el-button>
+                <el-button @click="handleClose('data')">取消</el-button>
+            </div>
+        </el-dialog>
     </el-dialog>
+
 </div>
 <!-- 开发环境版本，包含了有帮助的命令行警告 -->
 <script src="../../plugins/vue/vue.js"></script>
@@ -218,19 +249,13 @@
                     'dataname': '',
                     sort: ''
                 },
-                formData: {
-                    methodName: '',
-                    dataset: '',
-                    dataProcessing: ''
-                },
-                rules: {
-                    methodName: [
-                        { required: true, message: '算法名称不能为空', trigger: 'blur' }
-                    ],
-                    dataset: [
-                        { required: true, message: '请选择数据', trigger: 'change' }
-                    ]
-                }
+                fileList: [],
+                markedFile: '',
+                options: [],
+                value: '',
+                innerVisible: false,
+                matList: [],
+                limit: 2,
             }
         },
         computed: {},
@@ -269,6 +294,7 @@
                     this.classData.title = "添加方法"
                     this.classData.dataname = st
                     this.classData.dialogVisible = true
+                    this.loadOptionData();
                 } else {
                     this.classData.title = "收敛性曲线"
                     this.classData.dataname = st.dataname
@@ -306,35 +332,78 @@
                 this.init()
             },
             // 关闭弹窗
-            handleClose(st) {
-                this.classData.dialogVisible = false
-                // 重置表单数据
-                this.formData.methodName = '';
-                this.formData.dataset = '';
-                this.formData.dataProcessing = '';
-                // 重置表单验证状态
-                this.$refs.formData.resetFields();
+            handleClose(type) {
+                if (type === 'method') {
+                    this.classData.dialogVisible = false
+                } else {
+                    this.innerVisible = false
+                }
             },
-            submitForm() {
-                // 表单验证
-                this.$refs.formData.validate(valid => {
-                    if (valid) {
-                        // 执行表单提交操作
-                        this.executeFormSubmit();
-                    } else {
-                        console.log('表单校验失败');
+            submitUpload(type) {
+                if (type === 'method') {
+                    if (!this.markedFile) {
+                        this.$message.error('请选择一个主文件');
+                        return;
                     }
-                });
+                    // this.$refs.upload.submit();
+                    const formData = new FormData();
+                    formData.append('markedFile', this.markedFile);
+
+                    // 添加其他需要传递到后端的数据
+                    formData.append('optionValue', this.value);
+                    // 添加文件
+                    this.fileList.forEach(file => {
+                        formData.append('files[]', file.raw);
+                    });
+                    // 发送请求到后端，传递formData
+                    axios
+                        .post('/common/upload', formData)
+                        .then((response) => {
+                            console.log('Upload response:', response.data);
+                            // 处理上传成功后的逻辑
+                            this.$refs.upload.submit();
+                            this.classData.dialogVisible = false;
+                        })
+                        .catch((error) => {
+                            console.error('Upload error:', error);
+                            // 处理上传失败后的逻辑
+                        });
+                } else {
+                    window.alert("123")
+                }
+
             },
-            executeFormSubmit() {
-                // 表单提交操作
-                console.log('方法名:', this.formData.methodName);
-                console.log('数据集选择:', this.formData.dataset);
-                console.log('数据处理方式:', this.formData.dataProcessing);
-                // 这里可以进行相应的处理逻辑，如发送请求或执行其他操作
-                // ...
-                // 关闭弹窗
-                this.handleClose();
+            handleRemove(file, fileList) {
+                console.log(file, fileList);
+            },
+            handlePreview(file) {
+                console.log(file);
+            },
+            handleChange(file, fileList) {
+
+                this.fileList = fileList;
+            },
+            handleRemoveMat(file, fileList) {
+                console.log(file, fileList);
+            },
+            handlePreviewMat(file) {
+                console.log(file);
+            },
+            handleExceedMat(files, fileList) {
+                this.$message.error('最多只能上传2个.mat文件');
+            },
+            handleChangeMat(file, fileList) {
+                this.matList = fileList;
+            },
+            // 加载下拉框数据
+            loadOptionData(){
+                axios.get('/para/options')
+                .then(response => {
+                    this.options = response.data.data;
+                })
+                .catch(error =>{
+                    console.error('Error: 加载数据集失败',error);
+                });
             }
         }
     })
