@@ -109,7 +109,7 @@
                             type="text"
                             size="small"
                             class="blueBug"
-                            @click="addMemberHandle(scope.row)"
+                            @click="executiveSearch(scope.row)"
                     >
                         执行寻优
                     </el-button>
@@ -313,6 +313,17 @@
                 this.page = 1;
                 this.init();
             },
+            // 执行寻优
+            executiveSearch(st){
+                st.status = 2
+                axios.put('/methods/executive/',st.name)
+                .then(response => {
+                    // 待做
+                }).catch(error =>{
+
+                });
+                console.log(st)
+            },
             // 添加
             addMemberHandle(st) {
                 if (st === 'add') {
@@ -390,7 +401,6 @@
                             window.localStorage.setItem("status",1)
                             window.localStorage.setItem("responseStr", response.data.data)
                             // 处理上传成功后的逻辑
-                            this.$refs.upload.delete
                             this.$message.success("文件上传成功！！！")
                         })
                         .catch((error) => {
@@ -455,6 +465,13 @@
                 const responseStr = window.localStorage.getItem("responseStr")
                 if (window.localStorage.getItem("status")){
                     console.log(responseStr)
+                    // 1. 发送Ajax请求到后端执行寻优，并改变数据库中status为2：寻优中
+
+                    // 2. 关闭弹窗回到主页面。
+                    this.classData.dialogVisible = false
+                    window.localStorage.removeItem("responseStr")
+                    window.localStorage.removeItem("status")
+
                 }else {
                     this.$message.error('请先上传后在执行寻优')
                 }

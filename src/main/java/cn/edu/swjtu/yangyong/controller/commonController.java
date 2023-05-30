@@ -81,6 +81,9 @@ public class commonController {
         int dotIndex = markedFile.indexOf('.');
         String subStr = markedFile.substring(0, dotIndex);
         methods.setMainName(subStr);
+        // 处理数据集的添加
+        methods.setDataName(optionValue);
+
         // 3. 处理其他函数，存到表中methods字段
         String otherMethods = "";
 
