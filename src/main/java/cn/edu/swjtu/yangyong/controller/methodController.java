@@ -27,6 +27,20 @@ public class methodController {
     private MethodsService methodsService;
 
 
+    @DeleteMapping
+    public R<String> deleteByNameAndDataname(@RequestParam String name,
+                                             @RequestParam String dataName) {
+
+        log.info("删除方法的name= {}, dataName={}",name,dataName);
+        // 构造拉姆达表达式
+        LambdaQueryWrapper <Methods> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(Methods::getName,name).eq(Methods::getDataName,dataName);
+        // 执行删除
+        methodsService.remove(queryWrapper);
+        return R.success("删除 "+ name+ "方法下的 "+ dataName+ "数据集成功");
+    }
+
+
     @GetMapping("/page")
     public R<Page> page(int page, int pageSize, String name) {
         Page pageInfo = new Page(page, pageSize);
@@ -46,9 +60,15 @@ public class methodController {
     private Queue<String[]> queue = new LinkedList<>();
     private Integer status = 0; // 保存请求状态，初始为0 表示未执行
 
+    /**
+     * 执行方法下的该数据集，同时改变status
+     * @param method
+     * @param dataset
+     * @return
+     */
     @PostMapping("/execute")
-    public R<Integer> executeMethod(@RequestParam("method") String method,
-                                    @RequestParam("dataset") String dataset) {
+    public R<Integer> executeMethod(@RequestParam String method,
+                                    @RequestParam String dataset) {
         if (status != 0) {
             status = 2;
             update(method, dataset, status);

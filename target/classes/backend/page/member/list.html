@@ -145,7 +145,7 @@
                             type="text"
                             size="small"
                             class="delBut non"
-                            @click="statusHandle(scope.row)">
+                            @click="deleteHandle(scope.row)">
                         <!--                            v-if="user === 'admin'"-->
 
                         删除
@@ -278,7 +278,7 @@
                     'categoryId': '',
                     'name': '',
                     'dataName': '',
-                    'mainName':'',
+                    'mainName': '',
                     'image': '',
                     sort: ''
                 },
@@ -291,14 +291,13 @@
                 limit: 10,
                 responseStr: '', //记录返回后的值
                 showText: false, // 控制点击提交后，显示一行文字
-                running:[],
+                running: [],
                 intervalId: null, // 保存定时器的ID
             }
         },
         computed: {},
         created() {
             this.init();
-            this.pollStatus();
         },
         mounted() {
         },
@@ -309,7 +308,7 @@
                     pageSize: this.pageSize,
                     name: this.input ? this.input : undefined
                 }
-                await getMemberList(params).then(res => {
+                await getMethodsList(params).then(res => {
                     this.tableData = res.data.records || []
                     this.counts = res.data.records.length
                 }).catch(err => {
@@ -327,28 +326,27 @@
             // 在表格中执行寻优
             executiveSearch(st) {
                 let s = 0;
-                this.tableData.forEach(row =>{
-                    if (row.status ===3){
+                this.tableData.forEach(row => {
+                    if (row.status === 3) {
                         s = 1;
                     }
                 })
-                const formData = new FormData();
-                formData.append('method', st.mainName);
-
                 // 添加其他需要传递到后端的数据
-                formData.append('dataset', st.dataName);
+                const params = {
+                    method: st.mainName,
+                    dataset: st.dataName,
+                }
 
-                if (s===1)
-                    st.status = 2;
-                else
-                    st.status = 3;
+                st.status = (s === 1) ? 2 : 3
 
-                axios.post('/methods/execute', formData)
+                this.pollStatus();
+
+                executeMethods(params)
                     .then(response => {
                         this.init()
                         console.log(response)
                     }).catch(error => {
-                        console.error(error)
+                    console.error(error)
                 });
                 console.log(st)
             },
@@ -369,25 +367,31 @@
                     // this.imageUrl = `/common/download?name=test.png`
                 }
             },
-            //状态修改
-            statusHandle(row) {
+            //删除方法
+            deleteHandle(row) {
                 this.id = row.id
                 this.status = row.status
-                this.$confirm('删除该方法?', '提示', {
-                    'confirmButtonText': '确定',
-                    'cancelButtonText': '取消',
-                    'type': 'warning'
-                }).then(() => {
-                    deleteMethod({'id': this.id, 'status': !this.status ? 1 : 0}).then(res => {
-                        console.log('enableOrDisableEmployee', res)
-                        if (String(res.code) === '1') {
-                            this.$message.success('账号状态更改成功！')
-                            this.handleQuery()
-                        }
-                    }).catch(err => {
-                        this.$message.error('请求出错了：' + err)
+                if (row.status === 1 || row.status === 0) {
+                    this.$confirm('删除 《 ' + row.name + ' 》方法下的 < ' + row.dataName + ' > 数据集？', '提示', {
+                        'confirmButtonText': '确定',
+                        'cancelButtonText': '取消',
+                        'type': 'warning'
+                    }).then(() => {
+                        deleteMethod({'name': row.name, 'dataName': row.dataName}).then(res => {
+                            console.log('deleteMethod', res)
+                            if (String(res.code) === '1') {
+                                this.$message.success('删除 《 ' + row.name + ' 》方法下的 < ' + row.dataName + ' > 数据集成功！')
+                                this.handleQuery()
+                            }
+                        }).catch(err => {
+                            this.$message.error('请求出错了：' + err)
+                        })
                     })
-                })
+                } else {
+                    let str = ''
+                    this.$message.warning(str = (row.status === 2) ? "排队中,无法删除" : "寻优中,无法删除")
+                }
+
             },
             handleSizeChange(val) {
                 this.pageSize = val
@@ -507,14 +511,16 @@
             },
             // 立即寻优
             commitMethod() {
-                let runningStatus = 0;
                 const responseStr = window.localStorage.getItem("responseStr")
                 if (window.localStorage.getItem("upload")) {
                     console.log(responseStr)
-                    let formData = new FormData();
-                    formData.append("method", responseStr);
-                    formData.append("dataset", this.value);
-                    axios.post('/methods/execute', formData).then(response => {
+
+                    const params = {
+                        method: responseStr,
+                        dataset: this.value
+                    }
+                    this.pollStatus();
+                    executeMethods(params).then(response => {
                         console.log(response)
                         this.init();
                     }).catch(err => {
@@ -536,7 +542,7 @@
             pollStatus() {
                 setInterval(() => {
                     this.init()
-                }, 30000); // 每隔3秒钟轮询一次状态
+                }, 60000); // 每隔3秒钟轮询一次状态
             },
         }
     })
