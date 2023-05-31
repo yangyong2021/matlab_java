@@ -9,7 +9,7 @@ function getMemberList (params) {
 // 修改---启用禁用接口
 function deleteMethod (params) {
   return $axios({
-    url: '/employee',
+    url: '/methods',
     method: 'put',
     data: { ...params }
   })

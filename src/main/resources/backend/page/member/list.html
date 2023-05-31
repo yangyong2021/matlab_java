@@ -76,6 +76,12 @@
                             <span style="vertical-align: middle;margin-left: 0px">已寻优</span>
                         </el-button>
                     </template>
+                    <template v-else-if="String(scope.row.status) === '2'">
+                        <el-button type="warning" round style="height: 25px;padding: 0px 10px">
+                            <i class="el-icon-loading"></i>
+                            <span style="vertical-align: middle;margin-left: 0px">排队中</span>
+                        </el-button>
+                    </template>
                     <template v-else>
                         <el-button type="primary" round
                                    style="height: 25px;padding: 0px 10px;background: #409eff;border-color: #409eff;color: #FFFFFF">
@@ -105,14 +111,14 @@
             >
                 <template slot-scope="scope">
                     <template v-if="String(scope.row.status) === '0'">
-                    <el-button
-                            type="text"
-                            size="small"
-                            class="blueBug"
-                            @click="executiveSearch(scope.row)"
-                    >
-                        执行寻优
-                    </el-button>
+                        <el-button
+                                type="text"
+                                size="small"
+                                class="blueBug"
+                                @click="executiveSearch(scope.row)"
+                        >
+                            执行寻优
+                        </el-button>
                     </template>
                     <template v-else-if="String(scope.row.status) === '1'">
                         <el-button
@@ -198,7 +204,8 @@
                 <el-radio :label="file.name" v-for="file in fileList" :key="file.uid">{{ file.name }}</el-radio>
             </el-radio-group>
             <div slot="footer">
-                <el-button style="margin-left: 10px;" type="success" @click="submitUpload('method')">上传.m文件</el-button>
+                <el-text class="mx-1" v-if="showText" style="color: red">请点击 "马上执行寻优" 或 "暂时不寻优"</el-text>
+                <el-button style="margin-left: 10px;" type="success" @click="submitUpload('method')">提 交</el-button>
                 <el-button type="warning" @click="commitMethod">马上执行寻优</el-button>
                 <el-button @click="handleClose('method')">暂时不寻优</el-button>
             </div>
@@ -271,6 +278,7 @@
                     'categoryId': '',
                     'name': '',
                     'dataName': '',
+                    'mainName':'',
                     'image': '',
                     sort: ''
                 },
@@ -282,12 +290,15 @@
                 matList: [],
                 limit: 10,
                 responseStr: '', //记录返回后的值
+                showText: false, // 控制点击提交后，显示一行文字
+                running:[],
+                intervalId: null, // 保存定时器的ID
             }
         },
-        computed: {
-        },
+        computed: {},
         created() {
-            this.init()
+            this.init();
+            this.pollStatus();
         },
         mounted() {
         },
@@ -300,7 +311,7 @@
                 }
                 await getMemberList(params).then(res => {
                     this.tableData = res.data.records || []
-                    this.counts = res.data.total
+                    this.counts = res.data.records.length
                 }).catch(err => {
                     this.$message.error('请求出错了：' + err)
                 })
@@ -313,14 +324,31 @@
                 this.page = 1;
                 this.init();
             },
-            // 执行寻优
-            executiveSearch(st){
-                st.status = 2
-                axios.put('/methods/executive/',st.name)
-                .then(response => {
-                    // 待做
-                }).catch(error =>{
+            // 在表格中执行寻优
+            executiveSearch(st) {
+                let s = 0;
+                this.tableData.forEach(row =>{
+                    if (row.status ===3){
+                        s = 1;
+                    }
+                })
+                const formData = new FormData();
+                formData.append('method', st.mainName);
 
+                // 添加其他需要传递到后端的数据
+                formData.append('dataset', st.dataName);
+
+                if (s===1)
+                    st.status = 2;
+                else
+                    st.status = 3;
+
+                axios.post('/methods/execute', formData)
+                    .then(response => {
+                        this.init()
+                        console.log(response)
+                    }).catch(error => {
+                        console.error(error)
                 });
                 console.log(st)
             },
@@ -330,6 +358,7 @@
                     this.classData.title = "添加方法"
                     this.classData.dataName = st
                     this.classData.dialogVisible = true
+                    this.showText = false;
                     this.loadOptionData();
                 } else {
                     this.classData.title = "收敛性曲线"
@@ -344,7 +373,7 @@
             statusHandle(row) {
                 this.id = row.id
                 this.status = row.status
-                this.$confirm('删除该方法?', '提示', {
+                this.$confirm('删除'+row.name+'方法?', '提示', {
                     'confirmButtonText': '确定',
                     'cancelButtonText': '取消',
                     'type': 'warning'
@@ -371,19 +400,34 @@
             // 关闭弹窗
             handleClose(type) {
                 if (type === 'method') {
-                    this.classData.dialogVisible = false
-                } else {
+                    const responseStr = window.localStorage.getItem("responseStr")
+                    if (window.localStorage.getItem("upload")) {
+                        console.log(responseStr)
+                        // 2. 关闭弹窗回到主页面。
+                        this.classData.dialogVisible = false
+                        window.localStorage.removeItem("responseStr")
+                        window.localStorage.removeItem("upload")
+                        this.showText = false;
+                    } else {
+                        this.$message.error('请上传文件和选择数据集')
+                    }
 
+                } else {
                     this.innerVisible = false
                 }
             },
             submitUpload(type) {
                 if (type === 'method') {
+                    console.log(this.notes)
                     if (!this.markedFile) {
                         this.$message.error('请选择一个主文件');
                         return;
                     }
-                    // this.$refs.upload.submit();
+                    if (!this.value) {
+                        this.$message.error('请选择数据集');
+                        return;
+                    }
+                    this.showText = true;
                     const formData = new FormData();
                     formData.append('markedFile', this.markedFile);
 
@@ -397,8 +441,9 @@
                     axios
                         .post('/common/upload', formData)
                         .then((response) => {
+                            // 存储一个状态，必须上传之后才能寻优或者暂时不寻优
                             console.log('Upload response:', response.data);
-                            window.localStorage.setItem("status",1)
+                            window.localStorage.setItem("upload", 1)
                             window.localStorage.setItem("responseStr", response.data.data)
                             // 处理上传成功后的逻辑
                             this.$message.success("文件上传成功！！！")
@@ -418,7 +463,7 @@
                         .post('/common/uploadMat', formDataMat)
                         .then((response) => {
                             console.log('Upload response:', response.data);
-                            // 处理上传成功后的逻辑
+                            // 处理上传成功后的逻辑，再次查询得到Options的文件数据
                             this.loadOptionData()
                             this.innerVisible = false;
                         })
@@ -451,32 +496,47 @@
                 this.matList = fileList;
             },
             // 加载下拉框数据
-            loadOptionData(){
+            loadOptionData() {
                 axios.get('/para/options')
-                .then(response => {
-                    this.options = response.data.data;
-                })
-                .catch(error =>{
-                    console.error('Error: 加载数据集失败',error);
-                });
+                    .then(response => {
+                        this.options = response.data.data;
+                    })
+                    .catch(error => {
+                        console.error('Error: 加载数据集失败', error);
+                    });
             },
             // 立即寻优
-            commitMethod(){
+            commitMethod() {
                 const responseStr = window.localStorage.getItem("responseStr")
-                if (window.localStorage.getItem("status")){
+                if (window.localStorage.getItem("upload")) {
                     console.log(responseStr)
-                    // 1. 发送Ajax请求到后端执行寻优，并改变数据库中status为2：寻优中
+                    let formData = new FormData();
+                    formData.append("method", responseStr);
+                    formData.append("dataset", this.value);
+                    axios.post('/methods/execute', formData).then(response => {
+                        console.log(response)
+                        this.init();
+                    }).catch(err => {
+                        console.error(err)
+                    });
 
                     // 2. 关闭弹窗回到主页面。
                     this.classData.dialogVisible = false
+                    // 重新在加载一下主界面
+                    this.init();
                     window.localStorage.removeItem("responseStr")
-                    window.localStorage.removeItem("status")
-
-                }else {
-                    this.$message.error('请先上传后在执行寻优')
+                    window.localStorage.removeItem("upload")
+                    this.showText = false; //隐藏提示的一行字体
+                } else {
+                    this.$message.error('请先上传后再执行寻优')
                 }
 
-            }
+            },
+            pollStatus() {
+                setInterval(() => {
+                    this.init()
+                }, 30000); // 每隔3秒钟轮询一次状态
+            },
         }
     })
 </script>
